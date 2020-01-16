@@ -4,6 +4,7 @@ import java.util.jar.{JarEntry, JarInputStream}
 
 import org.scalatest.FreeSpec
 
+
 class ContentSpec extends FreeSpec {
 
   "The wrapped jar should contain the same entries as the original jar" in {
@@ -19,8 +20,8 @@ class ContentSpec extends FreeSpec {
       val ois = new JarInputStream(file.getInputStream)
       var entry: JarEntry = ois.getNextJarEntry()
       var entries: Seq[String] = Seq()
-      while(entry != null) {
-        if(!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
+      while (entry != null) {
+        if (!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
         entry = ois.getNextJarEntry()
       }
       ois.close()
@@ -29,6 +30,9 @@ class ContentSpec extends FreeSpec {
 
     val origEntries = jarEntryNameGenerator(orig)
     val osgiEntries = jarEntryNameGenerator(osgi)
+
+    val missingEntries = origEntries.filterNot(e => osgiEntries.contains(e))
+    assert(missingEntries.isEmpty, s"\n  Missing entries: ${missingEntries.mkString(",\n  ")}")
 
     assert(origEntries.sorted === osgiEntries.sorted)
   }

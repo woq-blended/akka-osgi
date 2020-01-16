@@ -1,5 +1,4 @@
 import org.scalatest.FreeSpec
-import testsupport.ContentSpec
 
 class Test1 extends FreeSpec {
   "test" in {
@@ -7,4 +6,4 @@ class Test1 extends FreeSpec {
   }
 }
 
-class Test2 extends ContentSpec
+class ContentSpec extends testsupport.ContentSpec

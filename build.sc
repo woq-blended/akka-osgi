@@ -44,17 +44,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
       `Import-Package` = Seq(
         """scala.*;version="[2.12,2.12.50]"""",
         "*"
-      ),
-      `Export-Package` = Seq(
-        "akka.shapeless",
-        "akka.shapeless.ops",
-        "akka.shapeless.syntax",
-        "akka.http.ccompat",
-        "akka.parboiled2",
-        "akka.parboiled2.support",
-        "akka.parboiled2.util",
-        "akka.macros"
-      ).map(_ + s""";version="${version}"""")
+      )
     )
   }
 
@@ -97,10 +87,6 @@ object akka extends Module {
 
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
-        `Import-Package` = Seq(
-          """scala.*;version="[2.12,2.12.50]"""",
-          "*"
-        ),
         `Export-Package` = Seq(
           "akka.shapeless",
           "akka.shapeless.ops",

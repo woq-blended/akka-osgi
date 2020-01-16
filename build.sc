@@ -6,6 +6,11 @@ import mill.api.Loose
 import mill.define.Target
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
+object Deps {
+  val osLib = ivy"com.lihaoyi::os-lib:0.6.2"
+  val scalatest = ivy"org.scalatest::scalatest:3.0.7"
+}
+
 trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule { outer =>
 
   def version: String
@@ -49,17 +54,9 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   }
 
   trait Tests extends super.Tests {
-
-    override def testFrameworks: T[Seq[String]] = T {
-      Seq("org.scalatest.tools.Framework")
-    }
-
-    override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-      Agg(
-        ivy"org.scalatest::scalatest:3.0.7"
-      )
-    }
-
+    override def moduleDeps: Seq[JavaModule] = Seq(testsupport)
+    override def testFrameworks: T[Seq[String]] = T { Seq("org.scalatest.tools.Framework") }
+    override def ivyDeps: Target[Loose.Agg[Dep]] = T { Agg(Deps.scalatest) }
     override def forkEnv: Target[Map[String, String]] = T{
       super.forkEnv() ++ Map(
         "origJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
@@ -67,8 +64,14 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
       )
     }
 
-    override def moduleDeps: Seq[JavaModule] = Seq(testsupport)
-
+    override def generatedSources: Target[Seq[PathRef]] = T {
+      val src =
+        """
+          |class ContentSpec extends testsupport.ContentSpec
+          |""".stripMargin
+      os.write(T.ctx.dest / "specs.scala", src)
+      super.generatedSources() ++ Seq(PathRef(T.ctx.dest))
+    }
   }
 }
 
@@ -78,13 +81,6 @@ object akka extends Module {
     val version = "10.1.11"
     val revision = "1-SNAPSHOT"
     val artifact = "akka-parsing"
-
-    override def ivyDeps = T {
-      Agg(
-        ivy"com.typesafe.akka::${artifact}:${version}"
-      )
-    }
-
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
         `Export-Package` = Seq(
@@ -99,19 +95,17 @@ object akka extends Module {
         ).map(_ + s""";version="${version}"""")
       )
     }
-
     object test extends Tests
-
   }
+
 }
 
 object testsupport extends ScalaModule {
   override def scalaVersion = T{"2.12.10"}
-
   override def ivyDeps: Target[Loose.Agg[Dep]] = T {
     Agg(
-      ivy"org.scalatest::scalatest:3.0.7",
-      ivy"com.lihaoyi::os-lib:0.6.2"
+      Deps.scalatest,
+      Deps.osLib
     )
   }
 }

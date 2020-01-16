@@ -2,7 +2,6 @@ package testsupport
 
 import java.util.jar.{JarEntry, JarInputStream}
 
-import geny.Generator
 import org.scalatest.FreeSpec
 
 class ContentSpec extends FreeSpec {
@@ -15,8 +14,6 @@ class ContentSpec extends FreeSpec {
     // both exists
     os.isFile(orig)
     os.isFile(osgi)
-
-    // Todo: check jar contents
 
     def jarEntryNameGenerator(file: os.Path): Seq[String] = {
       val ois = new JarInputStream(file.getInputStream)
@@ -33,12 +30,7 @@ class ContentSpec extends FreeSpec {
     val origEntries = jarEntryNameGenerator(orig)
     val osgiEntries = jarEntryNameGenerator(osgi)
 
-    println(orig + " ==> " + origEntries)
-    println(osgi + " ==> " + osgiEntries)
-
     assert(origEntries.sorted === osgiEntries.sorted)
-
-//    fail("In your dreams ...")
   }
 
 }

@@ -7,7 +7,7 @@ import mill.define.Target
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
 object Deps {
-  val osLib = ivy"com.lihaoyi::os-lib:0.6.2"
+  val osLib = ivy"com.lihaoyi::os-lib:0.6.3"
   val scalatest = ivy"org.scalatest::scalatest:3.0.7"
 }
 
@@ -76,6 +76,25 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 }
 
 object akka extends Module {
+
+  object `httpCore` extends WrapperProject {
+    val version = "10.1.11"
+    val revision = "1-SNAPSHOT"
+    val artifact = "akka-http-core"
+    override def osgiHeaders: T[OsgiHeaders] = T {
+      super.osgiHeaders().copy(
+        `Export-Package` = Seq(
+          "akka.http",
+          "akka.http.ccompat",
+          "akka.http.ccompat.imm",
+          "akka.http.impl.*",
+          "akka.http.javadsl.*",
+          "akka.http.scaladsl.*",
+        ).map(_ + s""";version="${version}"""")
+      )
+    }
+    object test extends Tests
+  }
 
   object parsing extends WrapperProject {
     val version = "10.1.11"

@@ -1,7 +1,6 @@
 import mill._
 import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1`
-import akka.parsing.{artifact, ivy, revision, version}
 import de.tobiasroeser.mill.osgi._
 import mill.api.Loose
 import mill.define.Target
@@ -12,6 +11,9 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   def version: String
   def revision: String
   def artifact: String
+  def ivyDep = ivy"com.typesafe.akka::${artifact}:${version}"
+
+  override def scalaVersion = T{ "2.12.10" }
 
   override def publishVersion = T {
     s"${version}-${revision}"
@@ -32,12 +34,10 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   }
 
   def originalJar: T[PathRef] = T{
-    resolveDeps(T.task{ Agg(ivy"com.typesafe.akka::${artifact}:${version}".exclude("*" -> "*"))})().toSeq.head
+    resolveDeps(T.task{ Agg(ivyDep.exclude("*" -> "*"))})().toSeq.head
   }
 
-  def ivyDeps = T { Agg(
-      ivy"com.typesafe.akka::${artifact}:${version}"
-  )}
+  override def ivyDeps = T { Agg(ivyDep) }
 
   override def osgiHeaders: T[OsgiHeaders] = T {
     super.osgiHeaders().copy(
@@ -72,7 +72,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 
     override def forkEnv: Target[Map[String, String]] = T{
       super.forkEnv() ++ Map(
-        "orgJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
+        "origJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
         "osgiJar" -> outer.osgiBundle().path.toIO.getAbsolutePath()
       )
     }
@@ -116,7 +116,6 @@ object akka extends Module {
 
     object test extends Tests
 
-    override def scalaVersion = "2.12.10"
   }
 }
 

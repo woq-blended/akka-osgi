@@ -6,8 +6,8 @@ class ContentSpec extends FreeSpec {
 
   "The wrapped jar should include everything from the original" in {
 
-    val orig : String = System.getProperty("orgJar")
-    val osgi : String = System.getProperty("osgiJar")
+    val orig : String = System.getenv("origJar")
+    val osgi : String = System.getenv("osgiJar")
 
     println(orig)
     println(osgi)

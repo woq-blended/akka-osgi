@@ -20,7 +20,7 @@ class ContentSpec extends FreeSpec {
       var entry: JarEntry = ois.getNextJarEntry()
       var entries: Seq[String] = Seq()
       while(entry != null) {
-        entries = entries ++ Seq(entry.getName())
+        if(!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
         entry = ois.getNextJarEntry()
       }
       ois.close()

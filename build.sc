@@ -59,15 +59,26 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   }
 
   trait Tests extends super.Tests {
-    def testJar = T{
-      val orig = outer.originalJar().path
-      val osgi = outer.osgiBundle().path
-      // both exists
-      os.isFile(orig)
-      os.isFile(osgi)
-      // Todo: check jar contents
-      println(s"Jar ${osgi} is OK")
+
+    override def testFrameworks: T[Seq[String]] = T {
+      Seq("org.scalatest.tools.Framework")
     }
+
+    override def ivyDeps: Target[Loose.Agg[Dep]] = T {
+      Agg(
+        ivy"org.scalatest::scalatest:3.0.7"
+      )
+    }
+
+    override def forkEnv: Target[Map[String, String]] = T{
+      super.forkEnv() ++ Map(
+        "orgJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
+        "osgiJar" -> outer.osgiBundle().path.toIO.getAbsolutePath()
+      )
+    }
+
+    override def moduleDeps: Seq[JavaModule] = Seq(testsupport)
+
   }
 }
 
@@ -103,19 +114,19 @@ object akka extends Module {
       )
     }
 
-    object test extends Tests {
-      override def testFrameworks: T[Seq[String]] = T {
-        Seq("org.scalatest.tools.Framework")
-      }
-
-      override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-        Agg(
-          ivy"org.scalatest::scalatest:3.0.7"
-        )
-      }
-    }
+    object test extends Tests
 
     override def scalaVersion = "2.12.10"
   }
+}
 
+object testsupport extends ScalaModule {
+  override def scalaVersion = T{"2.12.10"}
+
+  override def ivyDeps: Target[Loose.Agg[Dep]] = T {
+    Agg(
+      ivy"org.scalatest::scalatest:3.0.7",
+      ivy"com.lihaoyi::os-lib:0.6.2"
+    )
+  }
 }

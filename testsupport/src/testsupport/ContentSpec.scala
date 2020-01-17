@@ -32,7 +32,7 @@ class ContentSpec extends FreeSpec {
     val osgiEntries = jarEntryNameGenerator(osgi)
 
     val missingEntries = origEntries.filterNot(e => osgiEntries.contains(e))
-    assert(missingEntries.isEmpty, s"\n  Missing entries: ${missingEntries.mkString(",\n  ")}")
+    assert(missingEntries.isEmpty, s"\nMissing entries:\n  ${missingEntries.mkString(",\n  ")}")
 
     assert(origEntries.sorted === osgiEntries.sorted)
   }

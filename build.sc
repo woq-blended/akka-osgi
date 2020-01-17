@@ -2,7 +2,7 @@ import mill._
 import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1`
 import de.tobiasroeser.mill.osgi._
-import mill.api.Loose
+import mill.api.{Loose,Result}
 import mill.define.Target
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
@@ -42,7 +42,8 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     resolveDeps(T.task{ Agg(ivyDep.exclude("*" -> "*"))})().toSeq.head
   }
 
-  override def ivyDeps = T { Agg(ivyDep) }
+  override def ivyDeps = T { scalaLibraryIvyDeps() }
+  override def compileIvyDeps = T { Agg(ivyDep) }
 
   override def osgiHeaders: T[OsgiHeaders] = T {
     super.osgiHeaders().copy(
@@ -51,6 +52,26 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
         "*"
       )
     )
+  }
+
+  def compileIvyDepsTree(inverse: Boolean = false) = T.command {
+    val (flattened, resolution) = Lib.resolveDependenciesMetadata(
+      repositories,
+      resolveCoursierDependency().apply(_),
+      compileIvyDeps() ++ transitiveIvyDeps(),
+      Some(mapDependencies())
+    )
+
+    println(
+      coursier.util.Print.dependencyTree(
+        roots = flattened,
+        resolution = resolution,
+        printExclusions = false,
+        reverse = inverse
+      )
+    )
+
+    Result.Success()
   }
 
   trait Tests extends super.Tests {
@@ -127,4 +148,13 @@ object testsupport extends ScalaModule {
       Deps.osLib
     )
   }
+}
+
+def idea(ev: mill.eval.Evaluator) = T.command {
+  GenIdeaImpl(
+    ev,
+    implicitly,
+    ev.rootModule,
+    ev.rootModule.millDiscover
+  ).run()
 }

@@ -7,34 +7,35 @@ import org.scalatest.FreeSpec
 
 class ContentSpec extends FreeSpec {
 
-  "The wrapped jar should contain the same entries as the original jar" in {
+  val orig = os.Path(System.getenv("origJar"))
+  val osgi = os.Path(System.getenv("osgiJar"))
 
-    val orig = os.Path(System.getenv("origJar"))
-    val osgi = os.Path(System.getenv("osgiJar"))
+  s"The wrapped jar [${osgi.baseName}] should" - {
 
-    // both exists
-    os.isFile(orig)
-    os.isFile(osgi)
+    "contain the same entries as the original jar" in {
+      // both exists
+      assert(os.isFile(orig))
+      assert(os.isFile(osgi))
 
-    def jarEntryNameGenerator(file: os.Path): Seq[String] = {
-      val ois = new JarInputStream(file.getInputStream)
-      var entry: JarEntry = ois.getNextJarEntry()
-      var entries: Seq[String] = Seq()
-      while (entry != null) {
-        if (!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
-        entry = ois.getNextJarEntry()
+      def jarEntryNameGenerator(file: os.Path): Seq[String] = {
+        val ois = new JarInputStream(file.getInputStream)
+        var entry: JarEntry = ois.getNextJarEntry()
+        var entries: Seq[String] = Seq()
+        while (entry != null) {
+          if (!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
+          entry = ois.getNextJarEntry()
+        }
+        ois.close()
+        entries
       }
-      ois.close()
-      entries
+
+      val origEntries = jarEntryNameGenerator(orig)
+      val osgiEntries = jarEntryNameGenerator(osgi)
+
+      val missingEntries = origEntries.filterNot(e => osgiEntries.contains(e))
+      assert(missingEntries.isEmpty, s"\nMissing entries:\n  ${missingEntries.mkString(",\n  ")}")
+
+      assert(origEntries.sorted === osgiEntries.sorted)
     }
-
-    val origEntries = jarEntryNameGenerator(orig)
-    val osgiEntries = jarEntryNameGenerator(osgi)
-
-    val missingEntries = origEntries.filterNot(e => osgiEntries.contains(e))
-    assert(missingEntries.isEmpty, s"\nMissing entries:\n  ${missingEntries.mkString(",\n  ")}")
-
-    assert(origEntries.sorted === osgiEntries.sorted)
   }
-
 }

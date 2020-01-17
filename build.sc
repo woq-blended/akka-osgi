@@ -140,6 +140,7 @@ object akka extends Module {
 
 }
 
+/** Test cases to check integrity of generated OSGi bundles. */
 object testsupport extends ScalaModule {
   override def scalaVersion = T{"2.12.10"}
   override def ivyDeps: Target[Loose.Agg[Dep]] = T {
@@ -150,6 +151,7 @@ object testsupport extends ScalaModule {
   }
 }
 
+/** Generate IntelliJ IDEA project files. */
 def idea(ev: mill.eval.Evaluator) = T.command {
   GenIdeaImpl(
     ev,

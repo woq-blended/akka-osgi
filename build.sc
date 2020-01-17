@@ -58,6 +58,16 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     )
   }
 
+  def includeFromJar : T[Seq[String]] = T {
+    Seq.empty[String]
+  }
+
+  override def includeResource: T[Seq[String]] = T {
+    super.includeResource() ++ includeFromJar().map{ f =>
+      s"@${originalJar().path.toIO.getAbsolutePath()}!/$f"
+    }
+  }
+
   def compileIvyDepsTree(inverse: Boolean = false) = T.command {
     val (flattened, resolution) = Lib.resolveDependenciesMetadata(
       repositories,
@@ -106,6 +116,7 @@ object akka extends Module {
     val version = "10.1.11"
     val revision = "1-SNAPSHOT"
     val artifact = "akka-http-core"
+
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
         `Export-Package` = Seq(
@@ -118,6 +129,11 @@ object akka extends Module {
         ).map(_ + s""";version="${version}"""")
       )
     }
+
+    override def includeFromJar: T[Seq[String]] = T {
+      Seq("reference.conf", "akka-http-version.conf")
+    }
+
     object test extends Tests
   }
 

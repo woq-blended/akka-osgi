@@ -4,7 +4,6 @@ import java.util.jar.{JarEntry, JarInputStream}
 
 import org.scalatest.FreeSpec
 
-
 class ContentSpec extends FreeSpec {
 
   val orig = os.Path(System.getenv("origJar"))
@@ -34,6 +33,9 @@ class ContentSpec extends FreeSpec {
 
       val missingEntries = origEntries.filterNot(e => osgiEntries.contains(e))
       assert(missingEntries.isEmpty, s"\nMissing entries:\n  ${missingEntries.mkString(",\n  ")}")
+
+      val addedEntries = osgiEntries.filterNot(e => origEntries.contains(e))
+      assert(addedEntries.isEmpty, s"\nAdded entries:\n  ${addedEntries.mkString(",\n  ")}")
 
       assert(origEntries.sorted === osgiEntries.sorted)
     }

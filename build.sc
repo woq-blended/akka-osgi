@@ -2,7 +2,7 @@ import mill._
 import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1`
 import de.tobiasroeser.mill.osgi._
-import mill.api.{Loose,Result}
+import mill.api.{Loose, Result}
 import mill.define.Target
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
@@ -22,6 +22,10 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 
   override def publishVersion = T {
     s"${version}-${revision}"
+  }
+  override def bundleSymbolicName: T[String] = T {
+    // we want the scala version as part of the bundle symbolic name
+    OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifactId())
   }
 
   override def pomSettings: T[PomSettings] = T {

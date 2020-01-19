@@ -1,3 +1,5 @@
+import java.nio.file.attribute.PosixFilePermission
+
 import mill._
 import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.2`
@@ -196,3 +198,17 @@ def idea(ev: mill.eval.Evaluator) = T.command {
     ev.rootModule.millDiscover
   ).run()
 }
+
+
+/**
+ * Update the millw script.
+ */
+def millw() = T.command {
+  // https://raw.githubusercontent.com/lefou/millw/master/millw
+  val target = mill.modules.Util.download("https://raw.githubusercontent.com/lefou/millw/master/millw")
+  val millw = build.millSourcePath / "millw"
+  os.copy.over(target.path, millw)
+  os.perms.set(millw, os.perms(millw) + PosixFilePermission.OWNER_EXECUTE)
+  target
+}
+

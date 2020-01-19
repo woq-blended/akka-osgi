@@ -1,6 +1,6 @@
 import mill._
 import mill.scalalib._
-import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1-14-8d5a67`
+import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.2`
 import de.tobiasroeser.mill.osgi._
 import mill.api.{Loose, Result}
 import mill.define.Target

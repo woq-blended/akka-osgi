@@ -18,14 +18,17 @@ class ContentSpec extends FreeSpec {
 
       def jarEntryNameGenerator(file: os.Path): Seq[String] = {
         val ois = new JarInputStream(file.getInputStream)
-        var entry: JarEntry = ois.getNextJarEntry()
-        var entries: Seq[String] = Seq()
-        while (entry != null) {
-          if (!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
-          entry = ois.getNextJarEntry()
+        try {
+          var entry: JarEntry = ois.getNextJarEntry()
+          var entries: Seq[String] = Seq()
+          while (entry != null) {
+            if (!entry.isDirectory()) entries = entries ++ Seq(entry.getName())
+            entry = ois.getNextJarEntry()
+          }
+          entries
+        } finally {
+          ois.close()
         }
-        ois.close()
-        entries
       }
 
       val origEntries = jarEntryNameGenerator(orig)

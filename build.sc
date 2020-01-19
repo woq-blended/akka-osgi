@@ -1,6 +1,6 @@
 import mill._
 import mill.scalalib._
-import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1`
+import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.1-14-8d5a67`
 import de.tobiasroeser.mill.osgi._
 import mill.api.{Loose, Result}
 import mill.define.Target
@@ -121,7 +121,9 @@ object akka extends Module {
       super.osgiHeaders().copy(
         `Export-Package` = Seq(
           "akka.http",
-          "akka.http.ccompat",
+          // akka.http.ccompat is a split-package (also provided by akka.parsing)
+          // so we instead use `includeFromJar` and `exportContents`
+          // "akka.http.ccompat",
           "akka.http.ccompat.imm",
           "akka.http.impl.*",
           "akka.http.javadsl.*",
@@ -130,9 +132,23 @@ object akka extends Module {
       )
     }
 
-    override def includeFromJar: T[Seq[String]] = T {
-      Seq("reference.conf", "akka-http-version.conf")
-    }
+    override def exportContents: T[Seq[String]] = T{ Seq(
+      "akka.http.ccompat"
+    )}
+
+    override def includeFromJar: T[Seq[String]] = T { Seq(
+      "reference.conf",
+      "akka-http-version.conf",
+      "akka/http/ccompat/CompatImpl.class",
+      "akka/http/ccompat/package$.class",
+      "akka/http/ccompat/MapHelpers$.class",
+      "akka/http/ccompat/CompatImpl$.class",
+      "akka/http/ccompat/Builder.class",
+      "akka/http/ccompat/package.class",
+      "akka/http/ccompat/QuerySeqOptimized.class",
+      "akka/http/ccompat/CompatImpl$$anon$1.class",
+      "akka/http/ccompat/MapHelpers.class"
+    )}
 
     object test extends Tests
   }

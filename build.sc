@@ -15,6 +15,9 @@ object Deps {
 
 trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule { outer =>
 
+  val akkaHttpVersion : String = "10.1.11"
+  val akkaVersion : String = "2.6.0"
+
   def version: String
   def revision: String
   def artifact: String
@@ -115,7 +118,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 object akka extends Module {
 
   object httpCore extends WrapperProject {
-    val version = "10.1.11"
+    val version = akkaHttpVersion
     val revision = "1-SNAPSHOT"
     val artifact = "akka-http-core"
 
@@ -156,7 +159,7 @@ object akka extends Module {
   }
 
   object http extends WrapperProject {
-    val version = "10.1.11"
+    val version = akkaHttpVersion
     val revision = "1-SNAPSHOT"
     val artifact = "akka-http"
 
@@ -206,9 +209,10 @@ object akka extends Module {
   }
 
   object parsing extends WrapperProject {
-    val version = "10.1.11"
+    val version = akkaHttpVersion
     val revision = "1-SNAPSHOT"
     val artifact = "akka-parsing"
+
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
         `Export-Package` = Seq(
@@ -223,6 +227,49 @@ object akka extends Module {
         ).map(_ + s""";version="${version}"""")
       )
     }
+
+    object test extends Tests
+  }
+
+  object actor extends WrapperProject {
+    val version = akkaVersion
+    val revision = "1-SNAPSHOT"
+    val artifact = "akka-actor"
+
+    override def osgiHeaders: T[OsgiHeaders] = T {
+      super.osgiHeaders().copy(
+        `Export-Package` = Seq(
+          "akka.*"
+        ).map(_ + s""";version="${version}"""")
+      )
+    }
+
+    override def includeFromJar: T[Seq[String]] = T { Seq(
+      "reference.conf",
+      "version.conf"
+    )}
+
+    object test extends Tests
+  }
+
+  object stream extends WrapperProject {
+    val version = akkaVersion
+    val revision = "1-SNAPSHOT"
+    val artifact = "akka-stream"
+
+    override def osgiHeaders: T[OsgiHeaders] = T {
+      super.osgiHeaders().copy(
+        `Export-Package` = Seq(
+          "akka.stream.*",
+          "com.typesafe.sslconfig.akka.*"
+        ).map(_ + s""";version="${version}"""")
+      )
+    }
+
+    override def includeFromJar: T[Seq[String]] = T { Seq(
+      "reference.conf"
+    )}
+
     object test extends Tests
   }
 }

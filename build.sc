@@ -5,6 +5,7 @@ import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.2`
 import de.tobiasroeser.mill.osgi._
 import mill.api.{Loose, Result}
+import mill.define.Segment
 import mill.define.{Command, Target}
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
@@ -13,21 +14,31 @@ object Deps {
   val scalatest = ivy"org.scalatest::scalatest:3.0.7"
 }
 
-trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule { outer =>
+trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule {
+  outer =>
 
-  val akkaHttpVersion : String = "10.1.11"
-  val akkaVersion : String = "2.6.0"
+  val akkaHttpVersion: String = "10.1.11"
+  val akkaVersion: String = "2.6.0"
 
   def version: String
+
   def revision: String
-  def artifact: String
+
+  def artifact: String = millModuleSegments.value.flatMap {
+    case Segment.Label(l) => Seq(l)
+    case Segment.Cross(_) => Seq()
+  }.mkString("-")
+
   def ivyDep = ivy"com.typesafe.akka::${artifact}:${version}"
 
-  override def scalaVersion = T{ "2.12.10" }
+  override def scalaVersion = T {
+    "2.12.10"
+  }
 
   override def publishVersion = T {
     s"${version}-${revision}"
   }
+
   override def bundleSymbolicName: T[String] = T {
     // we want the scala version as part of the bundle symbolic name
     OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifactId())
@@ -47,12 +58,19 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     )
   }
 
-  def originalJar: T[PathRef] = T{
-    resolveDeps(T.task{ Agg(ivyDep.exclude("*" -> "*"))})().toSeq.head
+  def originalJar: T[PathRef] = T {
+    resolveDeps(T.task {
+      Agg(ivyDep.exclude("*" -> "*"))
+    })().toSeq.head
   }
 
-  override def ivyDeps = T { scalaLibraryIvyDeps() }
-  override def compileIvyDeps = T { Agg(ivyDep) }
+  override def ivyDeps = T {
+    scalaLibraryIvyDeps()
+  }
+
+  override def compileIvyDeps = T {
+    Agg(ivyDep)
+  }
 
   override def osgiHeaders: T[OsgiHeaders] = T {
     super.osgiHeaders().copy(
@@ -63,12 +81,12 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     )
   }
 
-  def includeFromJar : T[Seq[String]] = T {
+  def includeFromJar: T[Seq[String]] = T {
     Seq.empty[String]
   }
 
   override def includeResource: T[Seq[String]] = T {
-    super.includeResource() ++ includeFromJar().map{ f =>
+    super.includeResource() ++ includeFromJar().map { f =>
       s"@${originalJar().path.toIO.getAbsolutePath()}!/$f"
     }
   }
@@ -95,9 +113,16 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 
   trait Tests extends super.Tests {
     override def moduleDeps: Seq[JavaModule] = Seq(testsupport)
-    override def testFrameworks: T[Seq[String]] = T { Seq("org.scalatest.tools.Framework") }
-    override def ivyDeps: Target[Loose.Agg[Dep]] = T { Agg(Deps.scalatest) }
-    override def forkEnv: Target[Map[String, String]] = T{
+
+    override def testFrameworks: T[Seq[String]] = T {
+      Seq("org.scalatest.tools.Framework")
+    }
+
+    override def ivyDeps: Target[Loose.Agg[Dep]] = T {
+      Agg(Deps.scalatest)
+    }
+
+    override def forkEnv: Target[Map[String, String]] = T {
       super.forkEnv() ++ Map(
         "origJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
         "osgiJar" -> outer.osgiBundle().path.toIO.getAbsolutePath()
@@ -113,55 +138,16 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
       super.generatedSources() ++ Seq(PathRef(T.ctx.dest))
     }
   }
+
+  // enforce the test for each wrapper project
+  object test extends Tests
 }
 
 object akka extends Module {
 
-  object httpCore extends WrapperProject {
-    val version = akkaHttpVersion
-    val revision = "1-SNAPSHOT"
-    val artifact = "akka-http-core"
-
-    override def osgiHeaders: T[OsgiHeaders] = T {
-      super.osgiHeaders().copy(
-        `Export-Package` = Seq(
-          "akka.http",
-          // akka.http.ccompat is a split-package (also provided by akka.parsing)
-          // so we instead use `includeFromJar` and `exportContents`
-          // "akka.http.ccompat",
-          "akka.http.ccompat.imm",
-          "akka.http.impl.*",
-          "akka.http.javadsl.*",
-          "akka.http.scaladsl.*",
-        ).map(_ + s""";version="${version}"""")
-      )
-    }
-
-    override def exportContents: T[Seq[String]] = T{ Seq(
-      "akka.http.ccompat"
-    )}
-
-    override def includeFromJar: T[Seq[String]] = T { Seq(
-      "reference.conf",
-      "akka-http-version.conf",
-      "akka/http/ccompat/CompatImpl.class",
-      "akka/http/ccompat/package$.class",
-      "akka/http/ccompat/MapHelpers$.class",
-      "akka/http/ccompat/CompatImpl$.class",
-      "akka/http/ccompat/Builder.class",
-      "akka/http/ccompat/package.class",
-      "akka/http/ccompat/QuerySeqOptimized.class",
-      "akka/http/ccompat/CompatImpl$$anon$1.class",
-      "akka/http/ccompat/MapHelpers.class"
-    )}
-
-    object test extends Tests
-  }
-
   object http extends WrapperProject {
     val version = akkaHttpVersion
     val revision = "1-SNAPSHOT"
-    val artifact = "akka-http"
 
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
@@ -205,13 +191,49 @@ object akka extends Module {
       "akka/http/impl/settings/ServerSentEventSettingsImpl$.class"
     )}
 
-    object test extends Tests
+    object core extends WrapperProject {
+      val version = akkaHttpVersion
+      val revision = "1-SNAPSHOT"
+
+      override def osgiHeaders: T[OsgiHeaders] = T {
+        super.osgiHeaders().copy(
+          `Export-Package` = Seq(
+            "akka.http",
+            // akka.http.ccompat is a split-package (also provided by akka.parsing)
+            // so we instead use `includeFromJar` and `exportContents`
+            // "akka.http.ccompat",
+            "akka.http.ccompat.imm",
+            "akka.http.impl.*",
+            "akka.http.javadsl.*",
+            "akka.http.scaladsl.*",
+          ).map(_ + s""";version="${version}"""")
+        )
+      }
+
+      override def exportContents: T[Seq[String]] = T{ Seq(
+        "akka.http.ccompat"
+      )}
+
+      override def includeFromJar: T[Seq[String]] = T { Seq(
+        "reference.conf",
+        "akka-http-version.conf",
+        "akka/http/ccompat/CompatImpl.class",
+        "akka/http/ccompat/package$.class",
+        "akka/http/ccompat/MapHelpers$.class",
+        "akka/http/ccompat/CompatImpl$.class",
+        "akka/http/ccompat/Builder.class",
+        "akka/http/ccompat/package.class",
+        "akka/http/ccompat/QuerySeqOptimized.class",
+        "akka/http/ccompat/CompatImpl$$anon$1.class",
+        "akka/http/ccompat/MapHelpers.class"
+      )}
+    }
+
   }
 
   object parsing extends WrapperProject {
     val version = akkaHttpVersion
     val revision = "1-SNAPSHOT"
-    val artifact = "akka-parsing"
 
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
@@ -227,14 +249,11 @@ object akka extends Module {
         ).map(_ + s""";version="${version}"""")
       )
     }
-
-    object test extends Tests
   }
 
   object actor extends WrapperProject {
     val version = akkaVersion
     val revision = "1-SNAPSHOT"
-    val artifact = "akka-actor"
 
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
@@ -248,14 +267,11 @@ object akka extends Module {
       "reference.conf",
       "version.conf"
     )}
-
-    object test extends Tests
   }
 
   object stream extends WrapperProject {
     val version = akkaVersion
     val revision = "1-SNAPSHOT"
-    val artifact = "akka-stream"
 
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
@@ -269,8 +285,6 @@ object akka extends Module {
     override def includeFromJar: T[Seq[String]] = T { Seq(
       "reference.conf"
     )}
-
-    object test extends Tests
   }
 }
 

@@ -5,7 +5,7 @@ import mill.scalalib._
 import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.2`
 import de.tobiasroeser.mill.osgi._
 import mill.api.{Loose, Result}
-import mill.define.Target
+import mill.define.{Command, Target}
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
 object Deps {
@@ -114,7 +114,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
 
 object akka extends Module {
 
-  object `httpCore` extends WrapperProject {
+  object httpCore extends WrapperProject {
     val version = "10.1.11"
     val revision = "1-SNAPSHOT"
     val artifact = "akka-http-core"
@@ -155,6 +155,56 @@ object akka extends Module {
     object test extends Tests
   }
 
+  object http extends WrapperProject {
+    val version = "10.1.11"
+    val revision = "1-SNAPSHOT"
+    val artifact = "akka-http"
+
+    override def osgiHeaders: T[OsgiHeaders] = T {
+      super.osgiHeaders().copy(
+        `Export-Package` = Seq(
+          "akka.http.impl.settings.engine",
+          "akka.http.impl.settings.model",
+          "akka.http.impl.settings.util",
+          "akka.http.javadsl.coding",
+          "akka.http.javadsl.common",
+          "akka.http.javadsl.marshalling.*",
+          "akka.http.javadsl.server.*",
+          "akka.http.javadsl.unmarshalling.*",
+          "akka.http.scaladsl.client",
+          "akka.http.scaladsl.coding",
+          "akka.http.scaladsl.common",
+          "akka.http.scaladsl.marshalling.*",
+          "akka.http.scaladsl.server.*",
+          "akka.http.scaladsl.unmarshalling.*"
+        ).map(_ + s""";version="${version}"""")
+      )
+    }
+
+    override def exportContents: T[Seq[String]] = T{ Seq(
+      "akka.http.impl.settings",
+      "akka.http.javadsl.settings",
+      "akka.http.scaladsl.settings"
+    )}
+
+    override def includeFromJar: T[Seq[String]] = T { Seq(
+      "reference.conf",
+      "akka/http/javadsl/settings/ServerSentEventSettings.class",
+      "akka/http/javadsl/settings/RoutingSettings.class",
+      "akka/http/javadsl/settings/RoutingSettings$.class",
+      "akka/http/scaladsl/settings/ServerSentEventSettings.class",
+      "akka/http/scaladsl/settings/ServerSentEventSettings$.class",
+      "akka/http/scaladsl/settings/RoutingSettings.class",
+      "akka/http/scaladsl/settings/RoutingSettings$.class",
+      "akka/http/impl/settings/ServerSentEventSettingsImpl.class",
+      "akka/http/impl/settings/RoutingSettingsImpl.class",
+      "akka/http/impl/settings/RoutingSettingsImpl$.class",
+      "akka/http/impl/settings/ServerSentEventSettingsImpl$.class"
+    )}
+
+    object test extends Tests
+  }
+
   object parsing extends WrapperProject {
     val version = "10.1.11"
     val revision = "1-SNAPSHOT"
@@ -175,7 +225,6 @@ object akka extends Module {
     }
     object test extends Tests
   }
-
 }
 
 /** Test cases to check integrity of generated OSGi bundles. */
@@ -190,7 +239,7 @@ object testsupport extends ScalaModule {
 }
 
 /** Generate IntelliJ IDEA project files. */
-def idea(ev: mill.eval.Evaluator) = T.command {
+def idea(ev: mill.eval.Evaluator) : Command[Unit] = T.command {
   GenIdeaImpl(
     ev,
     implicitly,

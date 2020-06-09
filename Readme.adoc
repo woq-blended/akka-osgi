@@ -1,2 +1,82 @@
-= OSGi Bundles for Akka
+== OSGi Bundles for Akka
+
+With https://github.com/akka/akka/issues/28304[Issue 28304] the akka team has announced that the OSGi support for
+Akka shall be moved out of the main project as per Akka 2.6.2.
+
+As of today, https://akka.io/[Akka 2.6.6] is still released with OSGi Headers in most of it's bundles, but the goal
+of removing the OSGi support is still https://github.com/akka/akka/issues/28304#issuecomment-620022900[valid].
+
+This project aims to provide jars based on the original jars provided by Akka with proper Manifests so that Akka
+can be used within OSGi. Our own https://github.com/woq-blended/blended[project] heavily relies on Akka, Akka Stream
+and Akka Http, so that we need those bundles for ourselves.
+
+=== Approach
+
+We will consume the jars for a given Akka version and run them through our build process to provide the OSGi manifest.
+For each jar we run a quick sanity check to make sure that our bundling process didn't lose any content of the
+original jar.
+
+We start out the process with a limited set of Akka jars required by our own project. Over time we may add more
+bundles, perhaps with some help from the community.
+
+Later in the process we hope to add more tests to verify that the bundles are working as expected. For now we are
+using the test we have in our main project to validate that our bundles are working.
+
+=== Build from source
+
+We use https://github.com/lihaoyi/mill[Mill build tool] to build the bundles.
+
+After cloning the repository, simply navigate to the checkout directory and use the bundled mill
+script `./millw`, which is a copy of https://github.com/lefou/millw[lefou/millw].
+
+=== Selected build targets / commands
+
+|===
+| mill command | Description
+
+| `mill __.publishLocal`
+| Build and publish all publishable artifacts into a local ivy2 repository.
+
+| `mill __.publishM2Local`
+| Build and publish all publishable artifacts into a local Maven2 repository.
+
+| `mill -j 0 -k __.testCached`
+| Run all unit test in parallel and keep mill going even a test failure occured
+|===
+
+=== IDE support
+
+We use https://www.jetbrains.com/idea/[IntelliJ] in our project.
+You can generate IntelliJ IDEA project files with mill with the following commandline:
+
+----
+mill mill.scalalib.GenIdea/idea
+----
+
+== Download  artifacts from Maven Central
+
+At the moment we not released any bundles. Once we have a stable set of bundles that can be used,
+they will be available via http://search.maven.org/#search|ga|1|g%3A%22de.wayofquality.blended%22[Maven Central].
+
+== License
+
+The Blended Akka Bundles are published under the http://www.apache.org/licenses/LICENSE-2.0[Apache License, Version 2.0]
+
+== Contribute
+
+Why not just clone our repo, dig around and send us some pull requests ....
+
+== Supporters
+
+https://www.jetbrains.com[JetBrains] is kindly supporting our project with full developer licenses
+of their product stack.
+
+== Feedback
+
+We are keen to know what you think about our project. What are your use cases, your wishes?
+
+If you spot something that makes you want to pull your hair,
+https://github.com/woq-blended/akka-osgi/issues[let us know] ;)
+
+
 

@@ -1,9 +1,23 @@
+import coursierapi.{Credentials, MavenRepository}
+
+val blendedMillVersion : String = "0.3-SNAPSHOT"
+
+interp.repositories() ++= Seq(
+  MavenRepository.of(s"https://u233308-sub2.your-storagebox.de/blended-mill/$blendedMillVersion")
+    .withCredentials(Credentials.of("u233308-sub2", "px8Kumv98zIzSF7k"))
+)
+
+interp.load.ivy("de.wayofquality.blended" %% "blended-mill" % blendedMillVersion)
+
+@
+
 import java.nio.file.attribute.PosixFilePermission
 
 import mill._
 import mill.scalalib._
-import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.1.2`
+import $ivy.`de.tototec::de.tobiasroeser.mill.osgi:0.3.0`
 import de.tobiasroeser.mill.osgi._
+
 import mill.api.{Loose, Result}
 import mill.define.Segment
 import mill.define.{Command, Target}
@@ -11,14 +25,14 @@ import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
 object Deps {
   val osLib = ivy"com.lihaoyi::os-lib:0.6.3"
-  val scalatest = ivy"org.scalatest::scalatest:3.0.7"
+  val scalatest = ivy"org.scalatest::scalatest:3.1.1"
 }
 
 trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule {
   outer =>
 
-  val akkaHttpVersion: String = "10.1.11"
-  val akkaVersion: String = "2.6.0"
+  val akkaHttpVersion: String = "10.1.12"
+  val akkaVersion: String = "2.6.6"
 
   def version: String
 
@@ -32,7 +46,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   def ivyDep = ivy"com.typesafe.akka::${artifact}:${version}"
 
   override def scalaVersion = T {
-    "2.12.10"
+    "2.13.2"
   }
 
   override def publishVersion = T {
@@ -119,7 +133,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     }
 
     override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-      Agg(Deps.scalatest)
+      super.ivyDeps() ++ Agg(Deps.scalatest)
     }
 
     override def forkEnv: Target[Map[String, String]] = T {
@@ -269,6 +283,19 @@ object akka extends Module {
     )}
   }
 
+  object protobuf extends WrapperProject {
+    val version = akkaVersion
+    val revision = "1-SNAPSHOT"
+
+    override def osgiHeaders: T[OsgiHeaders] = T {
+      super.osgiHeaders().copy(
+        `Export-Package` = Seq(
+          "akka.protobuf",
+        ).map(_ + s""";version="${version}"""")
+      )
+    }
+  }
+
   object stream extends WrapperProject {
     val version = akkaVersion
     val revision = "1-SNAPSHOT"
@@ -290,7 +317,7 @@ object akka extends Module {
 
 /** Test cases to check integrity of generated OSGi bundles. */
 object testsupport extends ScalaModule {
-  override def scalaVersion = T{"2.12.10"}
+  override def scalaVersion = T{"2.13.2"}
   override def ivyDeps: Target[Loose.Agg[Dep]] = T {
     Agg(
       Deps.scalatest,

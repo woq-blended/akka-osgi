@@ -12,7 +12,7 @@ class ContentSpec extends FreeSpec {
 
   s"The wrapped jar [${osgi.baseName}] should" - {
 
-    "exists as does the original jar" in {
+    "exist as does the original jar" in {
       assert(os.isFile(orig))
       assert(os.isFile(osgi))
     }

@@ -11,6 +11,11 @@ interp.load.ivy("de.wayofquality.blended" %% "blended-mill" % blendedMillVersion
 
 @
 
+// Define the Scala, Akka and Akka Http versions we want to create the bundles for
+val scalaVersions : Seq[String] = Seq("2.12.11", "2.13.2")
+val akkaVersions : Seq[String] = Seq("2.6.6")
+val akkaHttpVersions : Seq[String] = Seq("10.1.2")
+
 import java.nio.file.attribute.PosixFilePermission
 
 import mill._
@@ -23,19 +28,36 @@ import mill.define.Segment
 import mill.define.{Command, Target}
 import mill.scalalib.publish.{Developer, License, PomSettings, VersionControl}
 
-object Deps {
-  val osLib = ivy"com.lihaoyi::os-lib:0.6.3"
-  val scalatest = ivy"org.scalatest::scalatest:3.1.1"
+// imports from the blended-mill plugin
+import de.wayofquality.blended.mill.versioning.GitModule
+import de.wayofquality.blended.mill.publish.BlendedPublishModule
+import de.wayofquality.blended.mill.modules._
+
+val projectDir : os.Path = build.millSourcePath
+val revision = T { GitSupport.publishVersion() }
+
+object GitSupport extends GitModule {
+  override def millSourcePath = projectDir
 }
 
-trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModule {
-  outer =>
+trait WrapperProject extends BlendedBaseModule with BlendedOsgiModule with BlendedPublishModule { outer =>
+
+  class Deps extends BlendedDependencies
+  override type ProjectDeps = Deps
+
+  override def deps = new Deps()
+
+  override def baseDir = projectDir
+
+  override val githubRepo : String = "akka-osgi"
+  override val scpTargetDir : String = "akka-osgi"
+
+  override def description : String = s"OSGi Wrapper Bundle for $artifact"
 
   val akkaHttpVersion: String = "10.1.12"
   val akkaVersion: String = "2.6.6"
 
   def version: String
-
   def revision: String
 
   def artifact: String = millModuleSegments.value.flatMap {
@@ -56,20 +78,6 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
   override def bundleSymbolicName: T[String] = T {
     // we want the scala version as part of the bundle symbolic name
     OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifactId())
-  }
-
-  override def pomSettings: T[PomSettings] = T {
-    PomSettings(
-      description = s"OSGi Wrapper Bundle for ${artifact}",
-      organization = "de.wayofqualitiy",
-      url = "https://github.com/woq-blended/akka-osgi",
-      licenses = Seq(License.`Apache-2.0`),
-      versionControl = VersionControl.github(owner = "woq-blended", repo = "akka-osgi"),
-      developers = Seq(
-        Developer(id = "lefou", name = "Tobias Roeser", url = "https://github.com/lefou"),
-        Developer(id = "atooni", name = "Andreas Gies", url = "https://github.com/atooni")
-      )
-    )
   }
 
   def originalJar: T[PathRef] = T {
@@ -105,27 +113,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     }
   }
 
-  def compileIvyDepsTree(inverse: Boolean = false) = T.command {
-    val (flattened, resolution) = Lib.resolveDependenciesMetadata(
-      repositories,
-      resolveCoursierDependency().apply(_),
-      compileIvyDeps() ++ transitiveIvyDeps(),
-      Some(mapDependencies())
-    )
-
-    println(
-      coursier.util.Print.dependencyTree(
-        roots = flattened,
-        resolution = resolution,
-        printExclusions = false,
-        reverse = inverse
-      )
-    )
-
-    Result.Success()
-  }
-
-  trait Tests extends super.Tests {
+  trait Tests extends super.BlendedTests {
     override def moduleDeps: Seq[JavaModule] = Seq(testsupport)
 
     override def testFrameworks: T[Seq[String]] = T {
@@ -133,7 +121,7 @@ trait WrapperProject extends ScalaModule with OsgiBundleModule with PublishModul
     }
 
     override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-      super.ivyDeps() ++ Agg(Deps.scalatest)
+      super.ivyDeps() ++ Agg(deps.osLib)
     }
 
     override def forkEnv: Target[Map[String, String]] = T {
@@ -317,35 +305,16 @@ object akka extends Module {
 
 /** Test cases to check integrity of generated OSGi bundles. */
 object testsupport extends ScalaModule {
-  override def scalaVersion = T{"2.13.2"}
+
+  object Deps extends BlendedDependencies
+
+  override def millSourcePath = projectDir / "testsupport"
+
+  override def scalaVersion = T { scalaVersions.head }
   override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-    Agg(
+    super.ivyDeps() ++ Agg(
       Deps.scalatest,
       Deps.osLib
     )
   }
 }
-
-/** Generate IntelliJ IDEA project files. */
-def idea(ev: mill.eval.Evaluator) : Command[Unit] = T.command {
-  GenIdeaImpl(
-    ev,
-    implicitly,
-    ev.rootModule,
-    ev.rootModule.millDiscover
-  ).run()
-}
-
-
-/**
- * Update the millw script.
- */
-def millw() = T.command {
-  // https://raw.githubusercontent.com/lefou/millw/master/millw
-  val target = mill.modules.Util.download("https://raw.githubusercontent.com/lefou/millw/master/millw")
-  val millw = build.millSourcePath / "millw"
-  os.copy.over(target.path, millw)
-  os.perms.set(millw, os.perms(millw) + PosixFilePermission.OWNER_EXECUTE)
-  target
-}
-

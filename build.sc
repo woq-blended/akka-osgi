@@ -57,9 +57,11 @@ class wrapped(crossScalaVersion : String) extends Module {
       s"${typesafeVersion}-${revision()}"
     }
 
+    override def artifactName = artifact
+
     override def bundleSymbolicName: T[String] = T {
       // we want the scala version as part of the bundle symbolic name
-      OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifact) + "_" + scalaBinVersion()
+      OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifactId())
     }
 
     def originalJar: T[PathRef] = T {

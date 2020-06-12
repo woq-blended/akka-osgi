@@ -2,4 +2,6 @@
 /.idea_modules/
 /out/
 .metals/
+.bloop/
+.bsp/
 

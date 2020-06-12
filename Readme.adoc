@@ -40,8 +40,8 @@ script `./millw`, which is a copy of https://github.com/lefou/millw[lefou/millw]
 | `mill __.publishM2Local`
 | Build and publish all publishable artifacts into a local Maven2 repository.
 
-| `mill -j 0 -k __.testCached`
-| Run all unit test in parallel and keep mill going even a test failure occured
+| `mill -j 0 -k wrapped[2.13.2].__.testCached`
+| Run all unit test in parallel for Scala version 2.13.2 and keep mill going even a test failure occured
 |===
 
 === IDE support

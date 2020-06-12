@@ -3,8 +3,8 @@ import mill.Agg
 
 // Define the Scala, Akka and Akka Http versions we want to create the bundles for
 val scalaVersions : Seq[String] = Seq("2.12.11", "2.13.2")
-val akkaVersions : Seq[String] = Seq("2.6.5", "2.6.6")
-val akkaHttpVersions : Seq[String] = Seq("10.1.11", "10.1.12")
+val akkaVersions : Seq[String] = Seq("2.6.6")
+val akkaHttpVersions : Seq[String] = Seq("10.1.12")
 
 import mill._
 import mill.scalalib._
@@ -273,6 +273,30 @@ class wrapped(crossScalaVersion : String) extends Module {
       )
     }
 
+    object protobufv3 extends AkkaWrapper {
+
+      override def artifact: String = "akka-protobuf-v3"
+
+      override def exportPackages: Seq[String] = Seq(
+        "akka.protobufv3.internal.*",
+      )
+
+      override def includeFromJar : T[Seq[String]]= T { super.includeFromJar() ++ Seq(
+        "google/protobuf/any.proto",
+        "google/protobuf/api.proto",
+        "google/protobuf/compiler/plugin.proto",
+        "google/protobuf/descriptor.proto",
+        "google/protobuf/duration.proto",
+        "google/protobuf/empty.proto",
+        "google/protobuf/field_mask.proto",
+        "google/protobuf/source_context.proto",
+        "google/protobuf/struct.proto",
+        "google/protobuf/timestamp.proto",
+        "google/protobuf/type.proto",
+        "google/protobuf/wrappers.proto"
+      )}
+    }
+
     object stream extends AkkaWrapper {
 
       override def artifact = "akka-stream"
@@ -287,6 +311,15 @@ class wrapped(crossScalaVersion : String) extends Module {
           "reference.conf"
         )
       }
+    }
+
+    object slf4j extends AkkaWrapper {
+
+      override def artifact = "akka-slf4j"
+
+      override def exportPackages = Seq(
+        "akka.event.slf4j.*",
+      )
     }
   }
 }

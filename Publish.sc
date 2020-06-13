@@ -1,3 +1,4 @@
+import coursier.core.Info
 import mill._
 import mill.scalalib.PublishModule
 import mill.scalalib.publish._
@@ -20,8 +21,8 @@ trait BlendedPublishModule extends PublishModule {
   def organization : String = "de.wayofquality.blended"
 
   def developers : Seq[Developer] = Seq(
-    Developer("atooni", "Andreas Gies", "https://github.com/atooni"),
-    Developer("lefou", "Tobias Roeser", "https://github.com/lefou")
+    Developer("akka-osgi-contributors", "Akka Osgi Contributors", "https://github.com/woq-blended/akka-osgi/graphs/contributors"),
+    Developer("akka-contributors", "Akka Contributors", "https://github.com/akka/akka/graphs/contributors" )
   )
 
   def scpUser = T.input {

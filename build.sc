@@ -1,5 +1,10 @@
 import $ivy.`com.lihaoyi::mill-contrib-bloop:$MILL_VERSION`
+import coursier.core.Resolution
+import coursier.graph.DependencyTree
 import mill.Agg
+import mill.define.Task
+import mill.modules.Jvm
+import mill.scalalib.publish.{Artifact, Dependency, Scope}
 
 // Define the Scala, Akka and Akka Http versions we want to create the bundles for
 val scalaVersions : Seq[String] = Seq("2.12.11", "2.13.2")
@@ -29,11 +34,6 @@ object GitSupport extends GitModule {
   override def millSourcePath = projectDir
 }
 
-object Deps {
-  def scalatest = ivy"org.scalatest::scalatest:3.1.1"
-  def osLib = ivy"com.lihaoyi::os-lib:0.6.3"
-}
-
 val revision = T { GitSupport.publishVersion() }
 
 object wrapped extends mill.Cross[wrapped](scalaVersions:_*)
@@ -44,14 +44,18 @@ class wrapped(crossScalaVersion : String) extends Module {
     override val githubRepo : String = "akka-osgi"
     override val scpTargetDir : String = "akka-osgi"
 
-    override def description : String = s"OSGi Wrapper Bundle for $artifact"
+    override def description : String =
+      s"""OSGi Wrapper Bundle for $artifact. This is the original jar provided by the Akka team
+         | with reviewed OSGi manifest settings. No code has been changed within the jar nor has content
+         | been removed or added. For the original work, please refer to the Akka project documentation
+         | at https://akka.io.""".stripMargin
     override def scalaVersion : T[String] = crossScalaVersion
     def scalaBinVersion : T[String] = T { scalaVersion().split("\\.").take(2).mkString(".") }
 
     def typesafeVersion: String
     def artifact: String
 
-    def ivyDep = ivy"com.typesafe.akka::${artifact}:${typesafeVersion}"
+    def ivyDep : Dep = ivy"com.typesafe.akka::${artifact}:${typesafeVersion}"
 
     override def publishVersion = T {
       s"${typesafeVersion}-${revision()}"
@@ -64,6 +68,49 @@ class wrapped(crossScalaVersion : String) extends Module {
       OsgiBundleModule.calcBundleSymbolicName(pomSettings().organization, artifactId())
     }
 
+    override def moduleDeps: Seq[PublishModule] = super.moduleDeps
+
+    /** We will copy the direkt dependencies of the wrapped jar into our own pom,
+     * so that we can use it as a direct drop-in in place of the original jar.
+     */
+    // TODO: copy more settings and from the original pom, handle copyrights etc.
+    override def publishXmlDeps: Task[Agg[Dependency]] = T.task {
+
+      val calculateDep : coursier.Dependency => Dep = { d =>
+
+        val modOrg : String = d.module.organization.value
+        val modName : String = d.module.name.value
+
+        val (name : String, cross : CrossVersion) = {
+          if (modName.endsWith("_" + scalaBinVersion())) {
+            (modName.substring(0, modName.lastIndexOf("_")), CrossVersion.Binary(false))
+          } else {
+            (modName, CrossVersion.empty(false))
+          }
+        }
+
+        Dep(modOrg, name, d.version, cross, true)
+      }
+
+      val (flattened, res) = Lib.resolveDependenciesMetadata(
+        repositories,
+        resolveCoursierDependency().apply(_),
+        ivyDeps() ++ transitiveIvyDeps(),
+        Some(mapDependencies())
+      )
+
+      val tree = DependencyTree(res)
+
+      val pomDependencies : Seq[coursier.Dependency] =
+        (tree.map(_.dependency) ++ tree.flatMap(_.children).map(_.dependency)).distinct
+
+      val copiedDependencies : Seq[Dependency] = pomDependencies.map(calculateDep)
+        .map(d => Artifact.fromDep(d, scalaVersion(), scalaBinVersion(), ""))
+        .filterNot(_ == Artifact.fromDep(ivyDep, scalaVersion(), scalaBinVersion(), ""))
+
+      Agg(copiedDependencies:_*)
+    }
+
     def originalJar: T[PathRef] = T {
       resolveDeps(T.task {
         Agg(ivyDep.exclude("*" -> "*"))
@@ -71,11 +118,7 @@ class wrapped(crossScalaVersion : String) extends Module {
     }
 
     override def ivyDeps = T {
-      scalaLibraryIvyDeps()
-    }
-
-    override def compileIvyDeps = T {
-      Agg(ivyDep)
+      Agg(ivyDep) ++ scalaLibraryIvyDeps()
     }
 
     override def osgiHeaders: T[OsgiHeaders] = T {
@@ -105,10 +148,6 @@ class wrapped(crossScalaVersion : String) extends Module {
 
       override def testFrameworks: T[Seq[String]] = T {
         Seq("org.scalatest.tools.Framework")
-      }
-
-      override def ivyDeps: Target[Loose.Agg[Dep]] = T {
-        super.ivyDeps() ++ Agg(Deps.osLib)
       }
 
       override def forkEnv: Target[Map[String, String]] = T {
@@ -328,6 +367,11 @@ class wrapped(crossScalaVersion : String) extends Module {
 
 object testsupport extends mill.Cross[testsupport](scalaVersions:_*)
 class testsupport(crossScalaVersion : String) extends ScalaModule {
+
+  object Deps {
+    def scalatest = ivy"org.scalatest::scalatest:3.1.1"
+    def osLib = ivy"com.lihaoyi::os-lib:0.6.3"
+  }
 
   override def millSourcePath = projectDir / "testsupport"
 

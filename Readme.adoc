@@ -1,5 +1,7 @@
 == OSGi Bundles for Akka
 
+image:https://badges.gitter.im/woq-blended/akka-osgi.svg[link="https://gitter.im/woq-blended/akka-osgi?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge"]
+
 With https://github.com/akka/akka/issues/28304[Issue 28304] the akka team has announced that the OSGi support for
 Akka shall be moved out of the main project as per Akka 2.6.2.
 

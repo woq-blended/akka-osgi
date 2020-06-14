@@ -71,7 +71,7 @@ class wrapped(crossScalaVersion : String) extends Module {
     def ivyDep : Dep = ivy"com.typesafe.akka::${artifact}:${typesafeVersion}"
 
     override def publishVersion = T {
-      s"${typesafeVersion}-${revision()}"
+      s"${typesafeVersion}.${revision()}"
     }
 
     override def artifactName = artifact
@@ -107,7 +107,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
       val rewriteDep : Dep => Dep = { d =>
         if (containedBundles.contains(d.dep.module.name.value)) {
-          val newVersion : String = d.dep.version + "-" + revision()
+          val newVersion : String = d.dep.version + "." + revision()
           d.copy(dep = d.dep
             .withModule(d.dep.module.withOrganization(Organization(organization)))
             .withVersion(newVersion))
@@ -162,6 +162,20 @@ class wrapped(crossScalaVersion : String) extends Module {
           "*"
         ),
         `Export-Package` = exportPackages.map(_ + s""";version="${typesafeVersion}"""")
+      )
+    }
+
+    /**
+     * We put the original Manifest entries into the manifest. Otherwise the ManifestInfo.checkSameVersion
+     * in akka.util may fail
+     */
+    override def additionalHeaders: T[Map[String, String]] = T {
+      super.additionalHeaders() ++ Map(
+        "Implementation-Version" -> typesafeVersion,
+        "Implementation-Title" -> artifactName(),
+        "Implementation-Vendor-Id" -> ivyDep.dep.module.organization.value,
+        "Implementation-URL" -> "https://akka.io",
+        "Implementation-Vendor" -> "Lightbend"
       )
     }
 

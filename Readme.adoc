@@ -22,6 +22,24 @@ bundles, perhaps with some help from the community.
 Later in the process we hope to add more tests to verify that the bundles are working as expected. For now we are
 using the test we have in our main project to validate that our bundles are working.
 
+=== Revision and Republishing 
+
+This project will increase it's own version with every release. This version will be appended to the version number 
+of the original version of the akka jar. For example, if our version is `0.1` and the akka version is `2.6.6`, then 
+the published version of the OSGi enabled jar will be `2.6.6-0.1`.
+
+We will publish our releases in http://search.maven.org/#search|ga|1|g%3A%22de.wayofquality.blended%22[Maven Central].
+
+=== Rewrite published pom files
+
+Within our published pom files we will include all compile dependencies from the original akka jar. If the dependency 
+points to a jar that is also handled by this project, the dependency will be rewritten to point to the OSGi enabled 
+jar with the same revision instead. 
+
+NOTE: This is done to make the OSGi manifest entries visible to the bnd tool, so that proper imports can be generated 
+for any bundles built on top of the OSGi enabled akka jars. Even if Akka still provides OSGi manifest headers themselves, 
+you might want to reference the jar from this project in your build to ensure future compatibility. 
+
 === Build from source
 
 We use https://github.com/lihaoyi/mill[Mill build tool] to build the bundles.
@@ -64,19 +82,39 @@ The Blended Akka Bundles are published under the http://www.apache.org/licenses/
 
 == Contribute
 
-Why not just clone our repo, dig around and send us some pull requests ....
+All contributions to the project are more than welcome. Please be nice and follow the https://www.scala-lang.org/conduct[Scala Code of Conduct]. 
+
+For any CoC-related questions within this project, please send an eMail to andreas@wayofquality.de 
+
+=== Improve the documentation 
+
+If you want to improve the documentation, feel free to create a PR. We are looking for projects using our bundles, 
+links to working OSGi setups etc.
+
+=== Request more jars to be supported 
+
+We are starting with the jars that we require in our https://github.com/woq-blended/blended[project]. If you are missing 
+jars you would like to use, please open an https://github.com/woq-blended/blended/issues/new/choose[issue] and consider 
+creating a PR afterwards.
+
+=== Report an issue with a bundle provided by this project 
+
+If you are using one of our bundles and run into an OSGi problem, please open an https://github.com/woq-blended/akka-osgi/issues/new?assignees=&labels=&template=osgi-runtime-problem.md&title=[issue].
+
+NOTE: Please do not report akka related issues in our project. These should be reported to the https://github.com/akka/akka[akka project]. 
+
+== Projects using akka-osgi
+
+The following projects are using akka-osgi provided bundles:
+
+- https://github.com/woq-blended/blended[Blended]
+- https://github.com/woq-blended/blended.container[Blended Demo Container]
 
 == Supporters
 
 https://www.jetbrains.com[JetBrains] is kindly supporting our project with full developer licenses
 of their product stack.
 
-== Feedback
-
-We are keen to know what you think about our project. What are your use cases, your wishes?
-
-If you spot something that makes you want to pull your hair,
-https://github.com/woq-blended/akka-osgi/issues[let us know] ;)
 
 
 

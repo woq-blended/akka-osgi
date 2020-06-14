@@ -1,5 +1,5 @@
 import $ivy.`com.lihaoyi::mill-contrib-bloop:$MILL_VERSION`
-import coursier.core.Resolution
+import coursier.core.{Organization, Resolution}
 import coursier.graph.DependencyTree
 import mill.Agg
 import mill.define.Task
@@ -34,6 +34,16 @@ object GitSupport extends GitModule {
   override def millSourcePath = projectDir
 }
 
+/**
+ * List of bundles that are currently handled by the project. These are required
+ * to properly rewrite the dependencies of the published pom file.
+ */
+// TODO: Can we somehow autodiscover this list ?
+val containedBundles : Seq[String] = Seq(
+  "akka-actor", "akka-protobuf", "akka-protobuf-v3", "akka-stream", "akka-slf4j",
+  "akka-http", "akka-http-core", "akka-parsing"
+)
+
 val revision = T { GitSupport.publishVersion() }
 
 object wrapped extends mill.Cross[wrapped](scalaVersions:_*)
@@ -44,11 +54,14 @@ class wrapped(crossScalaVersion : String) extends Module {
     override val githubRepo : String = "akka-osgi"
     override val scpTargetDir : String = "akka-osgi"
 
-    override def description : String =
-      s"""OSGi Wrapper Bundle for $artifact. This is the original jar provided by the Akka team
+    override def description : String = {
+      val jarRef : String = s"${ivyDep.dep.module.organization.value}::${ivyDep.dep.module.name.value}:${ivyDep.dep.version}"
+      s"""OSGi Wrapper Bundle for [$jarRef]. This is the original jar provided by the Akka team
          | with reviewed OSGi manifest settings. No code has been changed within the jar nor has content
          | been removed or added. For the original work, please refer to the Akka project documentation
          | at https://akka.io.""".stripMargin
+    }
+
     override def scalaVersion : T[String] = crossScalaVersion
     def scalaBinVersion : T[String] = T { scalaVersion().split("\\.").take(2).mkString(".") }
 
@@ -74,8 +87,8 @@ class wrapped(crossScalaVersion : String) extends Module {
      * so that we can use it as a direct drop-in in place of the original jar.
      */
     // TODO: copy more settings and from the original pom, handle copyrights etc.
-    override def publishXmlDeps: Task[Agg[Dependency]] = T.task {
 
+    def pomDependencies : T[Agg[Dep]] = T {
       val calculateDep : coursier.Dependency => Dep = { d =>
 
         val modOrg : String = d.module.organization.value
@@ -92,6 +105,17 @@ class wrapped(crossScalaVersion : String) extends Module {
         Dep(modOrg, name, d.version, cross, true)
       }
 
+      val rewriteDep : Dep => Dep = { d =>
+        if (containedBundles.contains(d.dep.module.name.value)) {
+          val newVersion : String = d.dep.version + "-" + revision()
+          d.copy(dep = d.dep
+            .withModule(d.dep.module.withOrganization(Organization(organization)))
+            .withVersion(newVersion))
+        } else {
+          d
+        }
+      }
+
       val (flattened, res) = Lib.resolveDependenciesMetadata(
         repositories,
         resolveCoursierDependency().apply(_),
@@ -102,13 +126,23 @@ class wrapped(crossScalaVersion : String) extends Module {
       val tree = DependencyTree(res)
 
       val pomDependencies : Seq[coursier.Dependency] =
-        (tree.map(_.dependency) ++ tree.flatMap(_.children).map(_.dependency)).distinct
+        (tree.map(_.dependency) ++ tree.flatMap(_.children).map(_.dependency))
+          .distinct
+          .filter( d=> !d.module.name.value.startsWith(ivyDep.dep.module.name.value))
 
-      val copiedDependencies : Seq[Dependency] = pomDependencies.map(calculateDep)
-        .map(d => Artifact.fromDep(d, scalaVersion(), scalaBinVersion(), ""))
-        .filterNot(_ == Artifact.fromDep(ivyDep, scalaVersion(), scalaBinVersion(), ""))
+      val includedDeps : Seq[Dep] = pomDependencies.map(calculateDep).map(rewriteDep)
 
-      Agg(copiedDependencies:_*)
+      Agg(includedDeps:_*)
+    }
+
+    override def publishXmlDeps: Task[Agg[Dependency]] = T.task {
+
+      val toDependency : Dep => Dependency = { d =>
+        Artifact.fromDep(d, scalaVersion(), scalaBinVersion(), "")
+      }
+
+      pomDependencies()
+        .map(toDependency)
     }
 
     def originalJar: T[PathRef] = T {

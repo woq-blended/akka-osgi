@@ -54,6 +54,8 @@ class wrapped(crossScalaVersion : String) extends Module {
     override val githubRepo : String = "akka-osgi"
     override val scpTargetDir : String = "akka-osgi"
 
+    override def scpSubRepo: T[String] = T { revision() }
+
     override def description : String = {
       val jarRef : String = s"${ivyDep.dep.module.organization.value}::${ivyDep.dep.module.name.value}:${ivyDep.dep.version}"
       s"""OSGi Wrapper Bundle for [$jarRef]. This is the original jar provided by the Akka team

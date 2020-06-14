@@ -63,9 +63,13 @@ trait BlendedPublishModule extends PublishModule {
     )
   }
 
+  def scpSubRepo : T[String] = T {
+    publishVersion()
+  }
+
   def publishScp() : define.Command[Path] = T.command {
 
-    val path = T.dest / publishVersion()
+    val path = T.dest / scpSubRepo()
 
     val keyFile = T.dest / "scpKey"
     val knownHosts = T.dest / "known_hosts"

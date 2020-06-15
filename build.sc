@@ -153,6 +153,15 @@ class wrapped(crossScalaVersion : String) extends Module {
       })().iterator.toSeq.head
     }
 
+    def extraImports : T[Seq[String]] = T { Seq(
+      "com.sun.*;resolution:=optional",
+      "sun.*;resolution:=optional",
+      "net.liftweb.*;resolution:=optional",
+      "play.*;resolution:=optional",
+      "twirl.*;resolution:=optional",
+      "org.json4s.*;resolution:=optional"
+    )}
+
     override def ivyDeps = T {
       Agg(ivyDep) ++ scalaLibraryIvyDeps()
     }
@@ -160,10 +169,12 @@ class wrapped(crossScalaVersion : String) extends Module {
     override def osgiHeaders: T[OsgiHeaders] = T {
       super.osgiHeaders().copy(
         `Import-Package` = Seq(
-          s"""scala.*;version="[${scalaBinVersion()},${scalaBinVersion()}.50]"""",
-          "*"
-        ),
-        `Export-Package` = exportPackages.map(_ + s""";version="${typesafeVersion}"""")
+          s"""scala.util.parsing.*;version="[1.1.2,2.0.0)"""",
+          s"""scala.compat.java8.*;version="[0.9,1.0.0)"""",
+          s"""scala.*;version="[${scalaBinVersion()},${scalaBinVersion()}.50]""""
+        ) ++ extraImports() ++ Seq("*"),
+        `Export-Package` = exportPackages.map(_ + s""";version="${typesafeVersion}""""),
+        `Require-Capability` = Some("""osgi.ee;filter:="(&(osgi.ee=JavaSE)(version=1.8))"""")
       )
     }
 
@@ -226,6 +237,15 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     trait HttpWrapper extends WrapperProject {
       override val typesafeVersion : String = akkaHttpVersion
+
+      override def osgiHeaders: T[OsgiHeaders] = T { super.osgiHeaders().copy(
+        `Private-Package` = Seq(
+          "akka.http.ccompat",
+          "akka.http.impl.settings",
+          "akka.http.scaladsl.settings",
+          "akka.http.javadsl.settings"
+        ).map(_ + ";-split-package:=merge-first")
+      )}
     }
 
     object http extends HttpWrapper {
@@ -233,44 +253,23 @@ class wrapped(crossScalaVersion : String) extends Module {
       override def artifact = "akka-http"
 
       override def exportPackages: Seq[String] = Seq(
-        "akka.http.impl.settings.engine",
-        "akka.http.impl.settings.model",
-        "akka.http.impl.settings.util",
-        "akka.http.javadsl.coding",
-        "akka.http.javadsl.common",
-        "akka.http.javadsl.marshalling.*",
-        "akka.http.javadsl.server.*",
-        "akka.http.javadsl.unmarshalling.*",
-        "akka.http.scaladsl.client",
-        "akka.http.scaladsl.coding",
-        "akka.http.scaladsl.common",
+        "akka.http.scaladsl.client.*",
+        "akka.http.scaladsl.coding.*",
+        "akka.http.scaladsl.common.*",
         "akka.http.scaladsl.marshalling.*",
         "akka.http.scaladsl.server.*",
-        "akka.http.scaladsl.unmarshalling.*"
-      )
+        "akka.http.scaladsl.unmarshalling.*",
 
-      override def exportContents: T[Seq[String]] = T {
-        Seq(
-          "akka.http.impl.settings",
-          "akka.http.javadsl.settings",
-          "akka.http.scaladsl.settings"
-        )
-      }
+        "akka.http.javadsl.coding.*",
+        "akka.http.javadsl.common.*",
+        "akka.http.javadsl.marshalling.*",
+        "akka.http.javadsl.server.*",
+        "akka.http.javadsl.unmarshalling.*"
+      )
 
       override def includeFromJar: T[Seq[String]] = T {
         Seq(
-          "reference.conf",
-          "akka/http/javadsl/settings/ServerSentEventSettings.class",
-          "akka/http/javadsl/settings/RoutingSettings.class",
-          "akka/http/javadsl/settings/RoutingSettings$.class",
-          "akka/http/scaladsl/settings/ServerSentEventSettings.class",
-          "akka/http/scaladsl/settings/ServerSentEventSettings$.class",
-          "akka/http/scaladsl/settings/RoutingSettings.class",
-          "akka/http/scaladsl/settings/RoutingSettings$.class",
-          "akka/http/impl/settings/ServerSentEventSettingsImpl.class",
-          "akka/http/impl/settings/RoutingSettingsImpl.class",
-          "akka/http/impl/settings/RoutingSettingsImpl$.class",
-          "akka/http/impl/settings/ServerSentEventSettingsImpl$.class"
+          "reference.conf"
         )
       }
     }
@@ -280,35 +279,13 @@ class wrapped(crossScalaVersion : String) extends Module {
       override def artifact = "akka-http-core"
 
       override def exportPackages = Seq(
-        "akka.http",
-        // akka.http.ccompat is a split-package (also provided by akka.parsing)
-        // so we instead use `includeFromJar` and `exportContents`
-        // "akka.http.ccompat",
-        "akka.http.ccompat.imm",
-        "akka.http.impl.*",
-        "akka.http.javadsl.*",
-        "akka.http.scaladsl.*",
+        "akka.http.*"
       )
-
-      override def exportContents: T[Seq[String]] = T {
-        Seq(
-          "akka.http.ccompat"
-        )
-      }
 
       override def includeFromJar: T[Seq[String]] = T {
         Seq(
           "reference.conf",
-          "akka-http-version.conf",
-          "akka/http/ccompat/CompatImpl.class",
-          "akka/http/ccompat/package$.class",
-          "akka/http/ccompat/MapHelpers$.class",
-          "akka/http/ccompat/CompatImpl$.class",
-          "akka/http/ccompat/Builder.class",
-          "akka/http/ccompat/package.class",
-          "akka/http/ccompat/QuerySeqOptimized.class",
-          "akka/http/ccompat/CompatImpl$$anon$1.class",
-          "akka/http/ccompat/MapHelpers.class"
+          "akka-http-version.conf"
         )
       }
     }
@@ -318,14 +295,7 @@ class wrapped(crossScalaVersion : String) extends Module {
       override def artifact = "akka-parsing"
 
       override def exportPackages = Seq(
-        "akka.shapeless",
-        "akka.shapeless.ops",
-        "akka.shapeless.syntax",
-        "akka.http.ccompat",
-        "akka.parboiled2",
-        "akka.parboiled2.support",
-        "akka.parboiled2.util",
-        "akka.macros"
+        "akka.*"
       )
     }
   }

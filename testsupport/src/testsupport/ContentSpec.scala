@@ -7,26 +7,36 @@ import org.scalatest.FreeSpec
 
 class ContentSpec extends FreeSpec {
 
-  val orig = os.Path(System.getenv("origJar"))
-  val osgi = os.Path(System.getenv("osgiJar"))
+  val orig : Seq[os.Path] = System.getenv("origJars").split(":").map(s => os.Path(s)).toSeq
+  val osgi : os.Path = os.Path(System.getenv("osgiJar"))
 
   s"The wrapped jar [${osgi.baseName}] should" - {
 
     "exist as does the original jar" in {
-      assert(os.isFile(orig))
+      assert(orig.forall(os.isFile))
       assert(os.isFile(osgi))
     }
 
     "contain the same entries (name, size, digest) as the original jar" in {
-      val origEntries = jarEntryNameGenerator(orig)
+      val origEntries : Map[os.Path, Seq[JEntry]] = 
+        orig.map(p => p -> jarEntryNameGenerator(p)).toMap
       val osgiEntries = jarEntryNameGenerator(osgi)
 
-      val missingEntries = origEntries.filterNot(e => osgiEntries.exists(a => a.name == e.name))
+      val allOrigEntries : Seq[JEntry] = origEntries.values.flatten.iterator.toSeq.distinct
+      assert(
+        allOrigEntries.size == origEntries.values.foldLeft(0)( (c, v) => c + v.size),
+        "We will not combine non-disjunct jar files into a combined bundle"
+      )
+
+      // The list of entries in the original jar file(s) that have not made it into the bundle 
+      val missingEntries = allOrigEntries.filterNot(e => osgiEntries.exists(a => a.name == e.name))
       assert(missingEntries.isEmpty, s"\nMissing entries:\n  ${missingEntries.map(_.name).mkString(",\n  ")}")
-      val addedEntries = osgiEntries.filterNot(e => origEntries.exists(a => a.name == e.name))
+
+      // The list of entries that were somehow added to the combined jar file contents
+      val addedEntries = osgiEntries.filterNot(e => allOrigEntries.exists(a => a.name == e.name))
       assert(addedEntries.isEmpty, s"\nAdded entries:\n  ${addedEntries.map(_.name).mkString(",\n  ")}")
 
-      val e1 = origEntries.sortBy(_.name)
+      val e1 = allOrigEntries.sortBy(_.name)
       val e2 = osgiEntries.sortBy(_.name)
       e1.zip(e2).foreach { case (a, b) =>
         assert(a.name === b.name )
@@ -40,7 +50,7 @@ class ContentSpec extends FreeSpec {
   case class JEntry(name: String, size: Long, checksum: String = "")
 
 
-  def jarEntryNameGenerator(file: os.Path): Seq[JEntry] = {
+  private def jarEntryNameGenerator(file: os.Path): Seq[JEntry] = {
     val ois = new JarInputStream(file.getInputStream)
     val dis = new DigestInputStream(ois, MessageDigest.getInstance("SHA-1"))
     try {

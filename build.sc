@@ -51,13 +51,20 @@ class wrapped(crossScalaVersion : String) extends Module {
 
   trait WrapperProject extends ScalaModule with OsgiBundleModule with BlendedPublishModule { outer =>
 
+    /**
+      * Settings required to publish SNAPSHOT's in a temporary Maven snapshot repo vis scp.
+      */
     override val githubRepo : String = "akka-osgi"
     override val scpTargetDir : String = "akka-osgi"
-
     override def scpSubRepo: T[String] = T { revision() }
 
+    /**
+      * A generated description of the bundle.
+      */
     override def description : String = {
-      val jarRef : String = s"${ivyDep.dep.module.organization.value}::${ivyDep.dep.module.name.value}:${ivyDep.dep.version}"
+      val jarRef : String = 
+        bundleDeps.map(d => s"${d.dep.module.organization.value}::${d.dep.module.name.value}:${d.dep.version}")
+          .mkString(",")
       s"""OSGi Wrapper Bundle for [$jarRef]. This is the original jar provided by the Akka team
          | with reviewed OSGi manifest settings. No code has been changed within the jar nor has content
          | been removed or added. For the original work, please refer to the Akka project documentation
@@ -68,15 +75,19 @@ class wrapped(crossScalaVersion : String) extends Module {
     def scalaBinVersion : T[String] = T { scalaVersion().split("\\.").take(2).mkString(".") }
 
     def typesafeVersion: String
-    def artifact: String
 
-    def ivyDep : Dep = ivy"com.typesafe.akka::${artifact}:${typesafeVersion}"
+    /**
+      * The artifacts to be included in this wrapper bundle
+      */
+    def artifacts: Seq[String]
+
+    def bundleDeps : Seq[Dep] = artifacts.map(a => ivy"com.typesafe.akka::${a}:${typesafeVersion}")
 
     override def publishVersion = T {
       s"${typesafeVersion}.${revision()}"
     }
 
-    override def artifactName = artifact
+    override def artifactName = artifacts.head
 
     override def bundleSymbolicName: T[String] = T {
       // we want the scala version as part of the bundle symbolic name
@@ -127,10 +138,13 @@ class wrapped(crossScalaVersion : String) extends Module {
 
       val tree = DependencyTree(res)
 
+      val isInThisBundle : coursier.Dependency => Boolean = d =>
+        artifacts.exists(a => d.module.name.value.startsWith(a + "_"))
+
       val pomDependencies : Seq[coursier.Dependency] =
         (tree.map(_.dependency) ++ tree.flatMap(_.children).map(_.dependency))
           .distinct
-          .filter( d=> !d.module.name.value.startsWith(ivyDep.dep.module.name.value))
+          .filter( d=> !isInThisBundle(d))
 
       val includedDeps : Seq[Dep] = pomDependencies.map(calculateDep).map(rewriteDep)
 
@@ -147,10 +161,11 @@ class wrapped(crossScalaVersion : String) extends Module {
         .map(toDependency)
     }
 
-    def originalJar: T[PathRef] = T {
+    def originalJars: T[Seq[PathRef]] = T {
       resolveDeps(T.task {
-        Agg(ivyDep.exclude("*" -> "*"))
-      })().iterator.toSeq.head
+        val deps : Seq[Dep] = bundleDeps.map(_.exclude("*" -> "*"))
+        Agg(deps:_*)
+      })().iterator.toSeq
     }
 
     def extraImports : T[Seq[String]] = T { Seq(
@@ -163,7 +178,7 @@ class wrapped(crossScalaVersion : String) extends Module {
     )}
 
     override def ivyDeps = T {
-      Agg(ivyDep) ++ scalaLibraryIvyDeps()
+      Agg(bundleDeps:_*) ++ scalaLibraryIvyDeps()
     }
 
     override def osgiHeaders: T[OsgiHeaders] = T {
@@ -186,7 +201,7 @@ class wrapped(crossScalaVersion : String) extends Module {
       super.additionalHeaders() ++ Map(
         "Implementation-Version" -> typesafeVersion,
         "Implementation-Title" -> artifactName(),
-        "Implementation-Vendor-Id" -> ivyDep.dep.module.organization.value,
+        "Implementation-Vendor-Id" -> bundleDeps.head.dep.module.organization.value,
         "Implementation-URL" -> "https://akka.io",
         "Implementation-Vendor" -> "Lightbend"
       )
@@ -200,7 +215,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     override def includeResource: T[Seq[String]] = T {
       super.includeResource() ++ includeFromJar().map { f =>
-        s"@${originalJar().path.toIO.getAbsolutePath()}!/$f"
+        s"@${originalJars().head.path.toIO.getAbsolutePath()}!/$f"
       }
     }
 
@@ -213,7 +228,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
       override def forkEnv: Target[Map[String, String]] = T {
         super.forkEnv() ++ Map(
-          "origJar" -> outer.originalJar().path.toIO.getAbsolutePath(),
+          "origJars" -> outer.originalJars().map(_.path.toIO.getAbsolutePath()).mkString(":"),
           "osgiJar" -> outer.osgiBundle().path.toIO.getAbsolutePath()
         )
       }
@@ -237,67 +252,83 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     trait HttpWrapper extends WrapperProject {
       override val typesafeVersion : String = akkaHttpVersion
+    }
 
-      override def osgiHeaders: T[OsgiHeaders] = T { super.osgiHeaders().copy(
-        `Private-Package` = Seq(
-          "akka.http.ccompat",
-          "akka.http.impl.settings",
-          "akka.http.scaladsl.settings",
-          "akka.http.javadsl.settings"
-        ).map(_ + ";-split-package:=merge-first")
+    // object http extends HttpWrapper {
+
+    //   override def artifact = "akka-http"
+
+    //   override def exportPackages: Seq[String] = Seq(
+    //     "akka.http.scaladsl.*",
+    //     "akka.http.javadsl.*",
+    //   )
+
+    //   override def includeFromJar: T[Seq[String]] = T {
+    //     Seq(
+    //       "reference.conf"
+    //     )
+    //   }
+    // }
+
+    object api extends HttpWrapper {
+      override val description : String = "Package the Akka Http API into a bundle."
+
+      override def artifacts: Seq[String] = Seq("akka-http", "akka-http-core", "akka-parsing")
+
+      override def exportPackages : Seq[String] = Seq(
+        "akka.http.*;-split-package:=merge-first",
+        "akka.macros.*",
+        "akka.parboiled2.*",
+        "akka.shapeless.*"
+      )
+
+      override def osgiHeaders: T[OsgiHeaders] = T{ super.osgiHeaders().copy(
+        `Import-Package` = Seq(
+          """scala.compat.*;version="[0.8,1)"""",
+          s"""scala.*;version="[${scalaBinVersion()},${scalaBinVersion()}.50]"""",
+          //"com.sun.*;resolution:=optional",
+          //"sun.*;resolution:=optional",
+          //"net.liftweb.*;resolution:=optional",
+          //"play.*;resolution:=optional",
+          //"twirl.*;resolution:=optional",
+          //"org.json4s.*;resolution:=optional",
+          "*"
+        )
       )}
     }
 
-    object http extends HttpWrapper {
+    // object core extends HttpWrapper {
 
-      override def artifact = "akka-http"
+    //   override def artifact = "akka-http-core"
 
-      override def exportPackages: Seq[String] = Seq(
-        "akka.http.scaladsl.client.*",
-        "akka.http.scaladsl.coding.*",
-        "akka.http.scaladsl.common.*",
-        "akka.http.scaladsl.marshalling.*",
-        "akka.http.scaladsl.server.*",
-        "akka.http.scaladsl.unmarshalling.*",
+    //   override def exportPackages = Seq(
+    //     """akka.http.ccompat;core="split";mandatory:="core"""",
+    //     "akka.http.ccompat.imm",
+    //     "akka.http.impl.*",
+    //     "akka.http.javadsl.*",
+    //     "akka.http.scaladsl.*",
+    //     "akka.http"
+    //   )
 
-        "akka.http.javadsl.coding.*",
-        "akka.http.javadsl.common.*",
-        "akka.http.javadsl.marshalling.*",
-        "akka.http.javadsl.server.*",
-        "akka.http.javadsl.unmarshalling.*"
-      )
+    //   override def includeFromJar: T[Seq[String]] = T {
+    //     Seq(
+    //       "reference.conf",
+    //       "akka-http-version.conf"
+    //     )
+    //   }
+    // }
 
-      override def includeFromJar: T[Seq[String]] = T {
-        Seq(
-          "reference.conf"
-        )
-      }
-    }
+    // object parsing extends HttpWrapper {
 
-    object core extends HttpWrapper {
+    //   override def artifact = "akka-parsing"
 
-      override def artifact = "akka-http-core"
-
-      override def exportPackages = Seq(
-        "akka.http.*"
-      )
-
-      override def includeFromJar: T[Seq[String]] = T {
-        Seq(
-          "reference.conf",
-          "akka-http-version.conf"
-        )
-      }
-    }
-
-    object parsing extends HttpWrapper {
-
-      override def artifact = "akka-parsing"
-
-      override def exportPackages = Seq(
-        "akka.*"
-      )
-    }
+    //   override def exportPackages = Seq(
+    //     """akka.http.ccompat;parsing="split";mandatory:="parsing"""",
+    //     "akka.macros.*",
+    //     "akka.parboiled2.*",
+    //     "akka.shapeless.*"
+    //   )
+    // }
   }
 
   object akkaWrapped extends mill.Cross[akkaWrapped](akkaVersions:_*)
@@ -309,7 +340,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     object actor extends AkkaWrapper {
 
-      override def artifact = "akka-actor"
+      override def artifacts = Seq("akka-actor") 
 
       override def exportPackages = Seq(
         "akka.*"
@@ -325,7 +356,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     object protobuf extends AkkaWrapper {
 
-      override def artifact: String = "akka-protobuf"
+      override def artifacts: Seq[String] = Seq("akka-protobuf")
 
       override def exportPackages: Seq[String] = Seq(
         "akka.protobuf",
@@ -334,7 +365,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     object protobufv3 extends AkkaWrapper {
 
-      override def artifact: String = "akka-protobuf-v3"
+      override def artifacts: Seq[String] = Seq("akka-protobuf-v3")
 
       override def exportPackages: Seq[String] = Seq(
         "akka.protobufv3.internal.*",
@@ -358,12 +389,16 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     object stream extends AkkaWrapper {
 
-      override def artifact = "akka-stream"
+      override def artifacts : Seq[String] = Seq("akka-stream")
 
       override def exportPackages = Seq(
         "akka.stream.*",
         "com.typesafe.sslconfig.akka.*"
       )
+
+      override def osgiHeaders: T[OsgiHeaders] = T { super.osgiHeaders().copy(
+        `Fragment-Host` = Some(actor.bundleSymbolicName())
+      )}
 
       override def includeFromJar: T[Seq[String]] = T {
         Seq(
@@ -374,7 +409,7 @@ class wrapped(crossScalaVersion : String) extends Module {
 
     object slf4j extends AkkaWrapper {
 
-      override def artifact = "akka-slf4j"
+      override def artifacts : Seq[String] = Seq("akka-slf4j")
 
       override def exportPackages = Seq(
         "akka.event.slf4j.*",

@@ -32,7 +32,7 @@ jobs:
 
       - run: ./millw -i show revision ; echo "${{ github.ref }}"
 
-      - run: ./millw -i -j 0 -k wrapped[${{ matrix.scala-version }}].__.testCached
+      - run: ./millw -i -j 0 -k wrapped[${{ matrix.scala-version }}].__.publishLocal
 
       - name: Upload Testlogs
         uses: actions/upload-artifact@v2

@@ -95,7 +95,8 @@ Supported Scala versions::
   - 2.13.2
 
 
-.OSGi-fied Akka Jars
+==== OSGi-fied Akka Jars
+
 |===
 |Original Jar|Remarks
 
@@ -119,7 +120,8 @@ An exception might be the Java Serializer, which is not recommended to be used a
 
 |===
 
-.OSGi-fied Akka HTTP Jars
+==== OSGi-fied Akka HTTP Jars
+
 |===
 |Original Jar|Remarks
 

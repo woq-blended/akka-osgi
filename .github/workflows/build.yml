@@ -42,7 +42,7 @@ jobs:
           ./millw -i show revision 
           echo "GIT_TAG = [${{ env.GIT_TAG }}]"
 
-      - run: ./millw -i -j 0 -k .__.publishLocal
+      - run: ./millw -i -j 0 -k __.publishLocal
 
       - name: Upload Testlogs
         uses: actions/upload-artifact@v2

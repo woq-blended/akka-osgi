@@ -18,19 +18,59 @@ We will consume the jars for a given Akka version and run them through our build
 For each jar we run a quick sanity check to make sure that our bundling process didn't lose any content of the
 original jar.
 
+NOTE: This sanity check will break for jars that have split packages. I.e. the Akka HTTP API. 
+
 We start out the process with a limited set of Akka jars required by our own project. Over time we may add more
 bundles, perhaps with some help from the community.
 
 Later in the process we hope to add more tests to verify that the bundles are working as expected. For now we are
 using the test we have in our main project to validate that our bundles are working.
 
+=== General OSGi remarks 
+
+.From the Akka documentation:
+[quote]
+Akka only supports the usage of an ActorSystem strictly confined to a single OSGi bundle, where that bundle contains or imports all of the actor system’s requirements. This means that the approach of offering an ActorSystem as a service to which Actors can be deployed dynamically via other bundles is not recommended — an ActorSystem and its contained actors are not meant to be dynamic in this way. ActorRefs may safely be exposed to other bundles.
+
+We are providing the OSGified jars for our own project and we are using *one* ActorSystem within the OSGi container. The actor system is registered as a service and other bundles contribute their actors. With that approach one has to treat the actors within a bundle as a _self-contained_ group of actors, because they can come and go when bundles are loaded or removed from the system. If actors from other bundles are required these shall be used via a service rather than a lookup via the ActorSystem (even if the service is implemented with a lookup). 
+
+In practice we have found that this approach works very well and Akka works complementary with OSGi. 
+
+For example, we have implemented a bundle which offers an Akka HTTP service. Obviously, that bundle consumes the `ActorSystem` service, but also an optional `SSLContext` service to decide whether a SSL port shall be opened. The HTTP service does not register any routes by itself, but instead starts listening for `HTTPContext` services. Each context would encapsulate a plain Akka HTTP route together with a name. 
+
+Once such a service appears, the HTTP service picks it up and starts serving the route under it's name. 
+
+This is just one example how the application modules can be kept separate from each other within an OSGi environment. 
+
 === Revision and Republishing 
 
 This project will increase it's own version with every release. This version will be appended to the version number 
-of the original version of the akka jar. For example, if our version is `0.1` and the akka version is `2.6.6`, then 
-the published version of the OSGi enabled jar will be `2.6.6-0.1`.
+of the original version of the akka jar. For example, if our version is `1` and the akka version is `2.6.6`, then 
+the published version of the OSGi enabled jar will be `2.6.6.1`.
 
-We will publish our releases in http://search.maven.org/#search|ga|1|g%3A%22de.wayofquality.blended%22[Maven Central].
+Throughout development we will publish the built artifacts into a maven snapshot repo. The Snapshot repos are available 
+at https://u233308-sub2:px8Kumv98zIzSF7k@u233308-sub2.your-storagebox.de/akka-osgi/. This URL has a sub directory for each SNAPSHOT revision with a generated name. To use use one of the repos, find the name and configure it in your build tool as an additional source repo. 
+
+For example, if the repo name is `844b627` and you are using http://www.lihaoyi.com/mill/[mill] as your build tool, you would configure your repositories like in the example below:
+
+```
+/** Configure additional repositories. */
+trait CoreCoursierModule extends CoursierModule {
+  private def zincWorker: ZincWorkerModule = mill.scalalib.ZincWorkerModule
+  override def repositories: Seq[Repository] = {
+    zincWorker.repositories ++ Seq(
+      MavenRepository(
+        s"https://u233308-sub2.your-storagebox.de/akka-osgi/844b627",
+        Some(Authentication("u233308-sub2", "px8Kumv98zIzSF7k"))
+      )
+    )
+  }
+}
+```
+
+WARNING: The SNAPSHOT repos are not guaranteed to remain permanently. The snapshots are primarily published so that out own CI chain can access the bundle revisions under development.
+
+We will publish our releases in http://search.maven.org/#search|ga|1|g%3A%22de.wayofquality.blended%22[Maven Central] once the bundles have been verified by our integration test suite. 
 
 === Rewrite published pom files
 
@@ -41,6 +81,64 @@ jar with the same revision instead.
 NOTE: This is done to make the OSGi manifest entries visible to the bnd tool, so that proper imports can be generated 
 for any bundles built on top of the OSGi enabled akka jars. Even if Akka still provides OSGi manifest headers themselves, 
 you might want to reference the jar from this project in your build to ensure future compatibility. 
+
+=== Currently supported jars
+
+Supported Akka versions::
+  - 2.6.6
+
+Supported Akka HTTP versions::
+  - 10.1.12
+
+Supported Scala versions::
+  - 2.12.11
+  - 2.13.2
+
+
+.OSGi-fied Akka Jars
+[cols="1,3"]
+|===
+|Original Jar|Remarks
+
+|akka-actor
+.2+| Though akka-actor and akka-stream will be resolved individually within an OSGi container, it seems that there is an implicit dependency via reflection between the two jars when the default serializer is used. This Serializer lives in akka.stream, but the classloader of akka-actor must see it to bring up the actor system. 
+
+For nowwe have decided to make akka-stream a Fragment of akka-actor. The Fragment must be loaded with in the OSGi container unless another serializer is configuredand visible to the akka-actor bundle. Most likely the bundle containing another serializer implementation must be a fragment to akka.actor as well. 
+
+An exception might be the Java Serializer, which is not recommended to be used according to the https://gitter.im/akka/akka[akka gitter channel]. 
+
+|akka-stream
+
+|akka-protobuf
+|Just exposing the API
+
+|akka-protobuf-v3
+|Just exposing the API
+
+|akka-slf4j
+|Just exposing the API
+
+|===
+
+.OSGi-fied Akka HTTP Jars
+[cols="1,3"]
+|===
+|Original Jar|Remarks
+
+|akka-parsing
+.3+| It seems that `akka-parsing`, `akka-http-core` and `akka-http` cannot be used without each other. In other words, all three bundles must be loaded into the OSGi container if Akka HTTP is required. 
+
+Furthermore, within these bundles we see split packages between `akka-parsing` and `akka-http-core` and between `akka-http-core` and `akka-http`. These split packages require a special treatment. 
+
+Our approach for now is to combine the *combined* content of the split package in one of the jars. In other words, classes move from one jar to the other. The jar now containing *all* the classes from the split package will then export that package as part of the API. For these 3 bundles that does not represent a problem because the contant is disjunct. 
+
+With this approach we have been able to use Akka HTTP in our own container successfully. 
+
+|akka-http
+
+|akka-http-core
+
+|===
 
 === Build from source
 

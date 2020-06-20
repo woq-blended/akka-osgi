@@ -23,6 +23,7 @@ A clear and concise description of what you expected to happen.
 **Environment**
 - JDK
 - Scala Version 
+- Akka Version
 - Bundle Name
 - OSGi runtime 
 - OSGi error message 

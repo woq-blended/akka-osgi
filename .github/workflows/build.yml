@@ -1,7 +1,7 @@
 on:
   push:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 env:
   # This is the java version that will trigger an upload to the SNAPSHOT maven store
@@ -9,7 +9,7 @@ env:
   MAIN_JAVA_VERSION: 1.8
   # We will only publish the build artifacts to our pseudo snapshot repo for a push on
   # this branch
-  PUBLISH_BRANCH: refs/heads/master
+  PUBLISH_BRANCH: refs/heads/main
 
 jobs:
   build:
@@ -42,7 +42,7 @@ jobs:
           ./millw -i show revision 
           echo "GIT_TAG = [${{ env.GIT_TAG }}]"
 
-      - run: ./millw -i -j 0 -k wrapped[${{ matrix.scala-version }}].__.publishLocal
+      - run: ./millw -i -j 0 -k .__.publishLocal
 
       - name: Upload Testlogs
         uses: actions/upload-artifact@v2
@@ -62,4 +62,4 @@ jobs:
 
       - name: Release to Maven central
         if: ${{ matrix.java-version == env.MAIN_JAVA_VERSION && github.event_name == 'push' && env.GIT_TAG != ''}}
-        run: ./millw mill.scalalib.PublishModule/publishAll --sonatypeCreds "${{ secrets.OSSRH_USER}}:${{ secrets.OSSRH_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback" --publishArtifacts __.publishArtifacts --readTimeout 600000 --release true --signed true
+        run: ./millw mill.scalalib.PublishModule/publishAll --sonatypeCreds "${{ secrets.OSSRH_USER}}:${{ secrets.OSSRH_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback" --publishArtifacts wrapped[${{ matrix.scala-version }}].__.publishArtifacts --readTimeout 600000 --release true --signed true
